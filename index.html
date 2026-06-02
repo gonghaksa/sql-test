@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 크리처 TCG 퀘스트</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;700;900&display=swap');
+        body { font-family: 'Pretendard', sans-serif; background-color: #020617; color: #f8fafc; }
+        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 1rem; }
+        .tcg-card { width: 240px; height: 340px; border-radius: 12px; position: relative; padding: 12px; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border: 6px solid #334155; box-shadow: 0 10px 30px rgba(0,0,0,0.8); display: flex; flex-direction: column; overflow: hidden; transition: all 0.3s ease; }
+        .tcg-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.1) 45%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 55%, transparent 60%); background-size: 200% 200%; animation: holoshine 4s infinite linear; pointer-events: none; }
+        .card-fire { border-color: #ef4444; background: linear-gradient(135deg, #450a0a 0%, #0f172a 100%); }
+        .card-water { border-color: #3b82f6; background: linear-gradient(135deg, #172554 0%, #0f172a 100%); }
+        .card-earth { border-color: #22c55e; background: linear-gradient(135deg, #064e3b 0%, #0f172a 100%); }
+        .card-dark { border-color: #a855f7; background: linear-gradient(135deg, #3b0764 0%, #0f172a 100%); }
+        @keyframes holoshine { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .card-name { font-weight: 900; font-size: 14px; text-transform: uppercase; color: white; text-shadow: 1px 1px 2px black; }
+        .card-level { font-weight: 900; font-size: 12px; color: #fbbf24; }
+        .card-image-area { flex: 1; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 80px; margin-bottom: 12px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
+        .card-info-box { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 8px; border-radius: 4px; font-size: 10px; }
+        .card-ability { font-weight: 700; color: #e2e8f0; margin-bottom: 4px; display: flex; justify-content: space-between; }
+        .card-desc { color: #94a3b8; line-height: 1.2; font-style: italic; }
+        .tab-active { color: #fbbf24; border-bottom: 3px solid #fbbf24; }
+        .scroll-hide::-webkit-scrollbar { width: 4px; }
+        .scroll-hide::-webkit-scrollbar-track { background: transparent; }
+        .scroll-hide::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        .deck-slot { width: 100px; height: 140px; border: 2px dashed #334155; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.3); cursor: pointer; transition: all 0.3s; }
+        .deck-slot:hover { border-color: #fbbf24; background: rgba(251,191,36,0.1); }
+        .deck-slot.filled { border-style: solid; border-color: #fbbf24; background: rgba(251,191,36,0.2); }
+        .mini-card { width: 80px; height: 110px; border-radius: 6px; font-size: 40px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); border: 2px solid #fbbf24; }
+        .battle-log { background: rgba(0,0,0,0.5); border: 1px solid #334155; border-radius: 8px; padding: 12px; margin: 8px 0; font-size: 12px; }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+    <div id="app" class="h-full flex flex-col">
+        <!-- 로그인 화면 -->
+        <div id="login-screen" class="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950">
+            <div class="glass p-10 w-96 text-center border-yellow-500/30">
+                <div class="text-6xl mb-6">🃏</div>
+                <h1 class="text-3xl font-bold mb-2 bg-gradient-to-r from-yellow-400 to-red-500 bg-clip-text text-transparent">SQL CREATURE TCG</h1>
+                <p class="text-slate-400 text-sm mb-8">마스터 듀얼리스트의 길에 오신 것을 환영합니다</p>
+                <input type="text" id="nickname-input" placeholder="이름을 입력하세요" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 mb-4 focus:outline-none focus:ring-2 focus:ring-yellow-500 text-center">
+                <button onclick="startGame()" class="w-full bg-gradient-to-r from-yellow-600 to-red-600 hover:from-yellow-500 hover:to-red-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg">모험 시작하기</button>
+            </div>
+        </div>
+
+        <!-- 헤더 -->
+        <header id="main-header" class="bg-slate-900/80 border-b border-slate-800 p-4 flex justify-between items-center hidden">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-yellow-600 flex items-center justify-center font-bold text-white shadow-lg" id="user-avatar">?</div>
+                <div>
+                    <span id="user-name" class="font-bold text-slate-200 block">---</span>
+                    <span class="text-[10px] text-yellow-500 font-bold uppercase tracking-widest">Legendary Duelist</span>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="backupData()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-[12px] font-bold transition-colors flex items-center gap-1"><i class="fas fa-save"></i>백업</button>
+                <button onclick="restoreData()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-[12px] font-bold transition-colors flex items-center gap-1"><i class="fas fa-folder-open"></i>복구</button>
+            </div>
+            <div class="text-right">
+                <span class="text-slate-500 text-[10px] block uppercase font-bold">Deck Collection</span>
+                <span class="font-bold text-yellow-400 text-lg"><span id="card-count">0</span> / 30</span>
+            </div>
+        </header>
+
+        <!-- 메인 콘텐츠 -->
+        <main id="main-content" class="flex-1 flex flex-col md:flex-row overflow-hidden hidden h-full">
+            <!-- 가이드 패널 -->
+            <aside id="panel-guide" class="md:w-72 bg-slate-950 border-r border-slate-800 p-6 overflow-y-auto scroll-hide hidden md:block">
+                <h2 class="text-lg font-bold mb-6 flex items-center gap-2 text-yellow-500"><i class="fas fa-scroll"></i>마법 주문서</h2>
+                <div class="space-y-6 text-sm">
+                    <div class="bg-slate-900 p-4 rounded-lg border border-slate-800">
+                        <p class="text-yellow-500 font-bold mb-2">기본 소환</p>
+                        <p class="text-slate-400 text-xs">필드의 모든 크리처를 불러옵니다.</p>
+                        <code class="text-[10px] text-blue-300 block mt-1">SELECT * FROM characters;</code>
+                    </div>
+                    <div class="bg-slate-900 p-4 rounded-lg border border-slate-800">
+                        <p class="text-yellow-500 font-bold mb-2">AND</p>
+                        <p class="text-slate-400 text-xs">두 조건을 모두 만족해야 합니다.</p>
+                        <code class="text-[10px] text-blue-300 block mt-1">WHERE element='Fire' AND level>=10</code>
+                    </div>
+                    <div class="bg-slate-900 p-4 rounded-lg border border-slate-800">
+                        <p class="text-orange-400 font-bold mb-2">OR</p>
+                        <p class="text-slate-400 text-xs">둘 중 하나만 만족해도 됩니다.</p>
+                        <code class="text-[10px] text-blue-300 block mt-1">WHERE element='Fire' OR element='Water'</code>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- 퀘스트 패널 -->
+            <section id="panel-quest" class="flex-1 flex flex-col p-6 bg-slate-900 overflow-y-auto scroll-hide md:flex-1">
+                <div class="glass p-6 mb-6 border-yellow-500/20">
+                    <div class="flex justify-between items-center mb-4">
+                        <span id="mission-step" class="bg-yellow-600 text-[10px] font-bold px-2 py-1 rounded-full uppercase text-white">Quest 1</span>
+                    </div>
+                    <h3 id="mission-text" class="text-xl font-bold mb-2">---</h3>
+                    <p id="mission-hint" class="text-slate-500 text-sm italic">Hint: 주문에 실패하면 힌트 마법이 나타납니다.</p>
+                </div>
+                <div class="flex-1 flex flex-col bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden relative shadow-2xl min-h-[220px]">
+                    <div class="bg-slate-800/50 px-4 py-2 flex justify-between items-center border-b border-slate-800">
+                        <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Spell Casting Area</span>
+                        <i class="fas fa-magic text-yellow-500"></i>
+                    </div>
+                    <textarea id="sql-input" class="flex-1 bg-transparent p-6 font-mono text-lg text-yellow-200 focus:outline-none resize-none" placeholder="SELECT * FROM characters WHERE ..."></textarea>
+                    <button onclick="castSpell()" class="absolute bottom-6 right-6 bg-gradient-to-r from-yellow-600 to-red-600 hover:from-yellow-500 hover:to-red-500 text-white px-8 py-4 rounded-xl font-bold shadow-xl flex items-center gap-2 transition-transform active:scale-95 group">
+                        <i class="fas fa-bolt group-hover:animate-pulse"></i> 주문 시전
+                    </button>
+                </div>
+            </section>
+
+            <!-- 데이터 패널 -->
+            <section id="panel-data" class="md:w-[450px] bg-slate-950 border-l border-slate-800 flex flex-col hidden md:flex h-full">
+                <div class="p-4 border-b border-slate-800 flex gap-2">
+                    <button onclick="switchDataTab('table')" id="btn-tab-table" class="flex-1 py-2 font-bold text-sm tab-active">필드 데이터</button>
+                    <button onclick="switchDataTab('collection')" id="btn-tab-collection" class="flex-1 py-2 font-bold text-sm text-slate-500">내 도감</button>
+                    <button onclick="switchDataTab('battle')" id="btn-tab-battle" class="flex-1 py-2 font-bold text-sm text-slate-500">배틀</button>
+                </div>
+                
+                <!-- 데이터 테이블 -->
+                <div id="data-table-container" class="flex-1 overflow-y-auto scroll-hide p-4 min-h-0">
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-[10px] text-slate-500 uppercase font-bold">Summoned: <span id="result-count" class="text-yellow-400">0</span></span>
+                        <button onclick="renderTable(characters)" class="text-[10px] bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded border border-slate-700 text-slate-400 transition-colors">필드 초기화</button>
+                    </div>
+                    <table class="w-full text-left text-[10px] border-collapse">
+                        <thead>
+                            <tr class="text-yellow-500 border-b-2 border-slate-700 bg-slate-900/50">
+                                <th class="p-2 font-black uppercase tracking-tighter">name</th>
+                                <th class="p-2 font-black uppercase tracking-tighter">element</th>
+                                <th class="p-2 font-black uppercase tracking-tighter">personality</th>
+                                <th class="p-2 font-black uppercase tracking-tighter">level</th>
+                                <th class="p-2 font-black uppercase tracking-tighter">power</th>
+                            </tr>
+                        </thead>
+                        <tbody id="character-tbody" class="text-slate-300"></tbody>
+                    </table>
+                </div>
+
+                <!-- 도감 그리드 -->
+                <div id="collection-grid-container" class="flex-1 overflow-y-auto scroll-hide p-4 hidden min-h-0">
+                    <div id="collection-grid" class="grid grid-cols-4 gap-3"></div>
+                </div>
+
+                <!-- 배틀 탭 -->
+                <div id="battle-container" class="flex-1 overflow-y-auto scroll-hide p-4 hidden min-h-0 flex flex-col">
+                    <div class="mb-6">
+                        <h3 class="text-yellow-500 font-bold mb-3">내 공격 덱</h3>
+                        <div class="flex gap-3 justify-center">
+                            <div class="deck-slot" id="deck-slot-1"></div>
+                            <div class="deck-slot" id="deck-slot-2"></div>
+                            <div class="deck-slot" id="deck-slot-3"></div>
+                        </div>
+                    </div>
+                    <button id="battle-start-btn" onclick="startBattle()" disabled class="w-full bg-gradient-to-r from-yellow-600 to-red-600 disabled:opacity-50 disabled:cursor-not-allowed hover:from-yellow-500 hover:to-red-500 text-white font-bold py-3 rounded-xl transition-all">배틀 매칭 시작</button>
+                </div>
+            </section>
+        </main>
+
+        <!-- 모바일 네비 -->
+        <nav id="mobile-nav" class="md:hidden bg-slate-900 border-t border-slate-800 flex justify-around items-center h-20 hidden">
+            <button onclick="switchMobileTab('guide')" id="nav-guide" class="flex flex-col items-center gap-1 text-slate-500">
+                <i class="fas fa-scroll"></i><span class="text-[10px]">가이드</span>
+            </button>
+            <button onclick="switchMobileTab('quest')" id="nav-quest" class="flex flex-col items-center gap-1 text-yellow-500">
+                <i class="fas fa-bolt"></i><span class="text-[10px]">주문시전</span>
+            </button>
+            <button onclick="switchMobileTab('data')" id="nav-data" class="flex flex-col items-center gap-1 text-slate-500">
+                <i class="fas fa-th-large"></i><span class="text-[10px]">필드/덱</span>
+            </button>
+        </nav>
+
+        <!-- 카드 상세보기 모달 -->
+        <div id="card-modal" class="fixed inset-0 z-[300] bg-slate-950/95 flex items-center justify-center hidden p-6">
+            <div class="flex flex-col items-center justify-center w-full h-full">
+                <div id="modal-title" class="text-2xl font-black text-yellow-400 mb-8 italic text-center">SUMMONED!</div>
+                <div id="modal-content-area" class="flex justify-center scale-110 md:scale-125"></div>
+                <button onclick="closeModal()" class="mt-12 bg-gradient-to-r from-yellow-600 to-red-600 text-white font-bold px-16 py-4 rounded-xl hover:from-yellow-500 hover:to-red-500 transition-all shadow-xl">도감에 기록하기</button>
+            </div>
+        </div>
+
+        <!-- 배틀 모달 -->
+        <div id="battle-modal" class="fixed inset-0 z-[300] bg-slate-950/95 flex items-center justify-center hidden p-4">
+            <div class="glass border-yellow-500/30 p-8 w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-2xl">
+                <h2 class="text-2xl font-bold text-yellow-400 mb-6 text-center">⚔️ 크리처 배틀 ⚔️</h2>
+                <div id="battle-content" class="space-y-4"></div>
+                <div class="mt-6 flex gap-4">
+                    <button onclick="startBattleRound()" id="battle-start-round-btn" class="flex-1 bg-gradient-to-r from-yellow-600 to-red-600 text-white font-bold py-3 rounded-xl hover:from-yellow-500 hover:to-red-500 transition-all">전투 개시</button>
+                    <button onclick="closeBattle()" class="flex-1 bg-slate-800 text-slate-200 font-bold py-3 rounded-xl hover:bg-slate-700 transition-all">닫기</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 배틀 결과 모달 -->
+        <div id="battle-result-modal" class="fixed inset-0 z-[400] bg-slate-950/95 flex items-center justify-center hidden p-4">
+            <div class="glass border-yellow-500/30 p-8 w-full max-w-md rounded-2xl text-center">
+                <h2 id="result-title" class="text-3xl font-black text-yellow-400 mb-4">승리!</h2>
+                <p id="result-message" class="text-slate-300 mb-6">축하합니다!</p>
+                <div id="reward-card-area" class="mb-6"></div>
+                <button onclick="closeBattleResult()" class="w-full bg-gradient-to-r from-yellow-600 to-red-600 text-white font-bold py-3 rounded-xl hover:from-yellow-500 hover:to-red-500 transition-all">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const personalities = ['용감함', '신중함', '영리함', '까칠함'];
+        const elements = ['Fire', 'Water', 'Earth', 'Dark'];
+        const creatureNames = ['파이로', '아쿠아', '테라', '쉐도우', '볼트', '가이아', '네오', '루나', '솔라', '타이탄', '닉스', '드레이크', '펜릴', '이프리트', '시바', '베히모스', '바하무트', '오딘', '제우스', '포세이돈', '하데스', '아테나', '아레스', '헤르메스', '아폴론', '아르테미스', '헤라', '데메테르', '디오니소스', '헤파이스토스'];
+        const creatureEmojis = ['🔥', '💧', '🌿', '🌑', '⚡', '🌍', '✨', '🌙', '☀️', '🏔️', '🔮', '🐉', '🐺', '👹', '❄️', '🐘', '🐲', '⚔️', '⚡', '🔱', '💀', '🛡️', '🏹', '👟', '☀️', '🏹', '👑', '🌾', '🍷', '🔨'];
+        const missions = [
+            { id: 1, text: "모든 크리처를 조회하여 듀얼 필드를 활성화하세요.", check: (data) => data.length === 30, answer: "SELECT * FROM characters;" },
+            { id: 2, text: "속성(element)이 'Fire' 또는 'Water'인 크리처들을 모두 불러오세요.", check: (data) => data.length > 0 && data.every(c => c.element === 'Fire' || c.element === 'Water'), answer: "SELECT * FROM characters WHERE element = 'Fire' OR element = 'Water';" },
+            { id: 3, text: "레벨(level)이 15 이상인 강력한 크리처들을 선별하세요.", check: (data) => data.length > 0 && data.every(c => c.level >= 15), answer: "SELECT * FROM characters WHERE level >= 15;" },
+            { id: 4, text: "속성이 'Dark'이면서 전투력(power)이 7000 이상인 최정예를 찾으세요.", check: (data) => data.length > 0 && data.every(c => c.element === 'Dark' && c.power >= 7000), answer: "SELECT * FROM characters WHERE element = 'Dark' AND power >= 7000;" },
+            { id: 5, text: "성격이 '영리함'이고 레벨이 10 이하인 유망주 크리처들을 필터링하세요.", check: (data) => data.length > 0 && data.every(c => c.personality === '영리함' && c.level <= 10), answer: "SELECT * FROM characters WHERE personality = '영리함' AND level <= 10;" }
+        ];
+
+        let characters = [];
+        let userData = { nickname: '', ownedCards: [], missionIdx: 0, battleDeck: [] };
+        let currentMissionObj = null;
+        let battleState = null;
+
+        function initData() {
+            characters = [];
+            for (let i = 1; i <= 30; i++) {
+                characters.push({
+                    id: i,
+                    name: creatureNames[i-1],
+                    emoji: creatureEmojis[i-1] || '👾',
+                    personality: personalities[i % personalities.length],
+                    element: elements[i % elements.length],
+                    level: 5 + (i % 16),
+                    power: 2000 + ((i * 123) % 7001)
+                });
+            }
+        }
+
+        function parseAndFilter(query) {
+            try {
+                let q = query.trim().replace(/;/g, '').toLowerCase();
+                if (!q.startsWith('select')) return [];
+                const whereMatch = q.match(/where\s+(.+)/);
+                if (!whereMatch) return [...characters];
+                const conditionsStr = whereMatch[1];
+                if (conditionsStr.includes(' or ')) {
+                    const orGroups = conditionsStr.split(/\s+or\s+/);
+                    return characters.filter(char => orGroups.some(group => checkCondition(char, group)));
+                }
+                return characters.filter(char => checkCondition(char, conditionsStr));
+            } catch (e) { return []; }
+        }
+
+        function checkCondition(char, condStr) {
+            const conditions = condStr.split(/\s+and\s+/);
+            return conditions.every(cond => {
+                const parts = cond.trim().match(/(\w+)\s*(=|>=|<=|>|<)\s*(['"]?)(.+)\3/);
+                if (!parts) return false;
+                let [_, col, op, quote, val] = parts;
+                let charVal = char[col];
+                if (charVal === undefined) return false;
+                let compareVal = val.replace(/['"]/g, '').trim();
+                if (!isNaN(compareVal) && compareVal !== "") compareVal = Number(compareVal);
+                if (typeof charVal === 'string') charVal = charVal.toLowerCase();
+                if (typeof compareVal === 'string') compareVal = compareVal.toLowerCase();
+                switch (op) {
+                    case '=': return charVal == compareVal;
+                    case '>=': return charVal >= compareVal;
+                    case '<=': return charVal <= compareVal;
+                    case '>': return charVal > compareVal;
+                    case '<': return charVal < compareVal;
+                    default: return false;
+                }
+            });
+        }
+
+        function generateInfiniteMission() {
+            const type = Math.floor(Math.random() * 5);
+            if (type === 0) {
+                const el1 = elements[0], el2 = elements[1];
+                return { text: `'${el1}' 또는 '${el2}' 속성의 크리처를 모두 소환하세요.`, check: (data) => data.length > 0 && data.every(c => c.element === el1 || c.element === el2), answer: `SELECT * FROM characters WHERE element='${el1}' OR element='${el2}';` };
+            } else if (type === 1) {
+                const lv = 12;
+                return { text: `레벨이 ${lv} 이상인 강력한 크리처들을 선별하세요.`, check: (data) => data.length > 0 && data.every(c => c.level >= lv), answer: `SELECT * FROM characters WHERE level >= ${lv};` };
+            } else if (type === 2) {
+                const p = 6500;
+                return { text: `전투력이 ${p} 이상인 정예 크리처들을 불러오세요.`, check: (data) => data.length > 0 && data.every(c => c.power >= p), answer: `SELECT * FROM characters WHERE power >= ${p};` };
+            } else if (type === 3) {
+                const el = 'Dark', lv = 10;
+                return { text: `'${el}' 속성이면서 레벨이 ${lv} 이상인 크리처를 찾으세요.`, check: (data) => data.length > 0 && data.every(c => c.element === el && c.level >= lv), answer: `SELECT * FROM characters WHERE element='${el}' AND level >= ${lv};` };
+            } else {
+                const el = 'Fire', p = 5000, lv = 10;
+                return { text: `'${el}' 속성, 전투력 ${p} 이상, 레벨 ${lv} 이상인 크리처를 소환하세요.`, check: (data) => data.length > 0 && data.every(c => c.element === el && c.power >= p && c.level >= lv), answer: `SELECT * FROM characters WHERE element='${el}' AND power >= ${p} AND level >= ${lv};` };
+            }
+        }
+
+        function updateMissionUI() {
+            if (userData.missionIdx < missions.length) {
+                currentMissionObj = missions[userData.missionIdx];
+                document.getElementById('mission-step').innerText = `Mission ${currentMissionObj.id}`;
+            } else {
+                currentMissionObj = generateInfiniteMission();
+                document.getElementById('mission-step').innerText = `Infinite Duel`;
+            }
+            document.getElementById('mission-text').innerText = currentMissionObj.text;
+            document.getElementById('mission-hint').innerText = "주문에 실패하면 힌트 마법이 나타납니다.";
+        }
+
+        function renderTable(data) {
+            document.getElementById('result-count').innerText = data.length;
+            const tbody = document.getElementById('character-tbody');
+            tbody.innerHTML = data.map(c => `
+                <tr class="border-b border-slate-900/50 hover:bg-slate-900/30 transition-colors">
+                    <td class="p-2 font-bold text-slate-200 text-[11px]">${c.emoji} ${c.name}</td>
+                    <td class="p-2 text-[10px] font-bold ${getElementColor(c.element)}">${c.element}</td>
+                    <td class="p-2 text-[10px] text-slate-400">${c.personality}</td>
+                    <td class="p-2 text-yellow-500 font-bold text-[11px]">${c.level}</td>
+                    <td class="p-2 font-mono text-yellow-400 text-[11px]">${c.power}</td>
+                </tr>
+            `).join('');
+        }
+
+        function getElementColor(el) {
+            const map = { 'Fire': 'text-red-400', 'Water': 'text-blue-400', 'Earth': 'text-green-400', 'Dark': 'text-purple-400' };
+            return map[el] || '';
+        }
+
+        function castSpell() {
+            const query = document.getElementById('sql-input').value;
+            const filtered = parseAndFilter(query);
+            renderTable(filtered);
+            if (currentMissionObj && currentMissionObj.check(filtered)) {
+                const randomChar = characters[Math.floor(Math.random() * characters.length)];
+                if (!userData.ownedCards.includes(randomChar.id)) {
+                    userData.ownedCards.push(randomChar.id);
+                }
+                userData.missionIdx++;
+                saveData();
+                showCardModal(randomChar, true);
+            } else {
+                document.getElementById('mission-hint').innerText = `Hint: ${currentMissionObj.answer}`;
+            }
+        }
+
+        function createCardHTML(char) {
+            const elementClass = `card-${char.element.toLowerCase()}`;
+            return `
+                <div class="tcg-card ${elementClass}">
+                    <div class="card-header">
+                        <span class="card-name">${char.name}</span>
+                        <span class="card-level">LV.${char.level}</span>
+                    </div>
+                    <div class="card-image-area">${char.emoji}</div>
+                    <div class="card-info-box">
+                        <div class="card-ability">
+                            <span>Special Move</span>
+                            <span>${char.element} ATK</span>
+                        </div>
+                        <p class="card-desc">성격: ${char.personality}. 레벨 ${char.level}의 숙련도를 가진 크리처입니다.</p>
+                        <div class="mt-4 text-right font-bold text-yellow-500">POWER: ${char.power}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showCardModal(char, isNew = false) {
+            const modal = document.getElementById('card-modal');
+            const title = document.getElementById('modal-title');
+            const content = document.getElementById('modal-content-area');
+            modal.classList.remove('hidden');
+            title.innerText = isNew ? "QUEST COMPLETE: NEW CARD!" : "CARD DETAILS";
+            content.innerHTML = createCardHTML(char);
+        }
+
+        function closeModal() {
+            document.getElementById('card-modal').classList.add('hidden');
+            document.getElementById('sql-input').value = '';
+            updateMissionUI();
+            renderCollection();
+            document.getElementById('card-count').innerText = userData.ownedCards.length;
+        }
+
+        function renderCollection() {
+            const grid = document.getElementById('collection-grid');
+            grid.innerHTML = characters.map(c => {
+                const owned = userData.ownedCards.includes(c.id);
+                const inDeck = userData.battleDeck.includes(c.id);
+                return `
+                    <div onclick="${owned ? `toggleDeckCard(${c.id})` : ''}" 
+                         class="aspect-[3/4] rounded border-2 flex items-center justify-center text-xl transition-all cursor-pointer ${owned ? (inDeck ? 'bg-yellow-600/30 border-yellow-400 shadow-lg' : 'bg-slate-800 border-yellow-500 shadow-lg') : 'bg-slate-900 border-slate-800 opacity-20 grayscale'}">
+                        ${owned ? c.emoji : '?'}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function toggleDeckCard(cardId) {
+            if (userData.battleDeck.includes(cardId)) {
+                userData.battleDeck = userData.battleDeck.filter(id => id !== cardId);
+            } else if (userData.battleDeck.length < 3) {
+                userData.battleDeck.push(cardId);
+            }
+            updateDeckSlots();
+            renderCollection();
+            document.getElementById('battle-start-btn').disabled = userData.battleDeck.length < 3;
+        }
+
+        function updateDeckSlots() {
+            for (let i = 0; i < 3; i++) {
+                const slot = document.getElementById(`deck-slot-${i+1}`);
+                if (userData.battleDeck[i]) {
+                    const char = characters.find(c => c.id === userData.battleDeck[i]);
+                    slot.innerHTML = `<div class="mini-card">${char.emoji}</div>`;
+                    slot.classList.add('filled');
+                } else {
+                    slot.innerHTML = `<span class="text-slate-500 text-2xl">+</span>`;
+                    slot.classList.remove('filled');
+                }
+            }
+        }
+
+        function startBattle() {
+            if (userData.battleDeck.length < 3) return;
+            const aiDeck = [];
+            for (let i = 0; i < 3; i++) {
+                let randomId = Math.floor(Math.random() * 30) + 1;
+                while (aiDeck.includes(randomId)) randomId = Math.floor(Math.random() * 30) + 1;
+                aiDeck.push(randomId);
+            }
+            battleState = {
+                userDeck: userData.battleDeck.map(id => characters.find(c => c.id === id)),
+                aiDeck: aiDeck.map(id => characters.find(c => c.id === id)),
+                userWins: 0,
+                aiWins: 0,
+                round: 0
+            };
+            document.getElementById('battle-modal').classList.remove('hidden');
+            document.getElementById('battle-content').innerHTML = `
+                <div class="text-center mb-6">
+                    <p class="text-slate-300 mb-4">AI 라이벌이 3장의 크리처를 준비했습니다!</p>
+                    <p class="text-yellow-400 font-bold">준비 완료. [전투 개시] 버튼을 누르세요!</p>
+                </div>
+            `;
+        }
+
+        function startBattleRound() {
+            document.getElementById('battle-start-round-btn').disabled = true;
+            let round = 0;
+            const interval = setInterval(() => {
+                if (round >= 3) {
+                    clearInterval(interval);
+                    showBattleResult();
+                    return;
+                }
+                const userCard = battleState.userDeck[round];
+                const aiCard = battleState.aiDeck[round];
+                const userWins = userCard.power > aiCard.power;
+                if (userWins) battleState.userWins++;
+                else battleState.aiWins++;
+                const result = userWins ? '승리!' : '패배!';
+                const resultColor = userWins ? 'text-green-400' : 'text-red-400';
+                document.getElementById('battle-content').innerHTML += `
+                    <div class="battle-log">
+                        <div class="flex justify-between items-center">
+                            <div class="text-center flex-1">
+                                <p class="text-slate-400 text-xs mb-1">나의 카드</p>
+                                <p class="text-lg font-bold">${userCard.emoji}</p>
+                                <p class="text-yellow-400 font-bold">PWR: ${userCard.power}</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-slate-400 text-xs mb-2">라운드 ${round + 1}</p>
+                                <p class="${resultColor} font-black text-lg">${result}</p>
+                                <p class="text-slate-500 text-xs mt-1">나: ${battleState.userWins} AI: ${battleState.aiWins}</p>
+                            </div>
+                            <div class="text-center flex-1">
+                                <p class="text-slate-400 text-xs mb-1">AI 카드</p>
+                                <p class="text-lg font-bold">${aiCard.emoji}</p>
+                                <p class="text-red-400 font-bold">PWR: ${aiCard.power}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                round++;
+            }, 1200);
+        }
+
+        function showBattleResult() {
+            document.getElementById('battle-modal').classList.add('hidden');
+            const resultModal = document.getElementById('battle-result-modal');
+            const titleEl = document.getElementById('result-title');
+            const msgEl = document.getElementById('result-message');
+            const rewardEl = document.getElementById('reward-card-area');
+            
+            if (battleState.userWins >= 2) {
+                titleEl.innerText = '🎉 승리! 🎉';
+                msgEl.innerText = `${battleState.userWins}승 ${battleState.aiWins}패로 승리했습니다!`;
+                const unownedCards = characters.filter(c => !userData.ownedCards.includes(c.id));
+                if (unownedCards.length > 0) {
+                    const reward = unownedCards[Math.floor(Math.random() * unownedCards.length)];
+                    userData.ownedCards.push(reward.id);
+                    rewardEl.innerHTML = `<p class="text-yellow-400 font-bold mb-3">보상: 새로운 카드!</p>${createCardHTML(reward)}`;
+                }
+            } else {
+                titleEl.innerText = '⚔️ 패배! ⚔️';
+                msgEl.innerText = `${battleState.userWins}승 ${battleState.aiWins}패로 패배했습니다.`;
+            }
+            saveData();
+            resultModal.classList.remove('hidden');
+        }
+
+        function closeBattle() {
+            document.getElementById('battle-modal').classList.add('hidden');
+            battleState = null;
+        }
+
+        function closeBattleResult() {
+            document.getElementById('battle-result-modal').classList.add('hidden');
+            userData.battleDeck = [];
+            updateDeckSlots();
+            renderCollection();
+            switchDataTab('collection');
+        }
+
+        function backupData() {
+            const code = btoa(JSON.stringify(userData));
+            navigator.clipboard.writeText(code).then(() => {
+                alert('백업 코드가 복사되었습니다! 메모장이나 카톡에 보관하세요.');
+            }).catch(() => {
+                prompt('백업 코드를 복사해주세요:', code);
+            });
+        }
+
+        function restoreData() {
+            const code = prompt('백업 코드를 입력하세요:');
+            if (code) {
+                try {
+                    const restored = JSON.parse(atob(code));
+                    userData = restored;
+                    saveData();
+                    location.reload();
+                } catch (e) {
+                    alert('유효하지 않은 코드입니다.');
+                }
+            }
+        }
+
+        function switchDataTab(tab) {
+            const table = document.getElementById('data-table-container');
+            const collection = document.getElementById('collection-grid-container');
+            const battle = document.getElementById('battle-container');
+            const btnTable = document.getElementById('btn-tab-table');
+            const btnColl = document.getElementById('btn-tab-collection');
+            const btnBattle = document.getElementById('btn-tab-battle');
+            
+            table.classList.add('hidden');
+            collection.classList.add('hidden');
+            battle.classList.add('hidden');
+            btnTable.classList.remove('tab-active');
+            btnColl.classList.remove('tab-active');
+            btnBattle.classList.remove('tab-active');
+            
+            if (tab === 'table') {
+                table.classList.remove('hidden');
+                btnTable.classList.add('tab-active');
+            } else if (tab === 'collection') {
+                collection.classList.remove('hidden');
+                btnColl.classList.add('tab-active');
+                renderCollection();
+            } else if (tab === 'battle') {
+                battle.classList.remove('hidden');
+                btnBattle.classList.add('tab-active');
+                updateDeckSlots();
+            }
+        }
+
+        function switchMobileTab(tab) {
+            const panels = ['panel-guide', 'panel-quest', 'panel-data'];
+            panels.forEach(p => document.getElementById(p).classList.add('hidden'));
+            document.querySelectorAll('#mobile-nav button').forEach(b => 
+                b.classList.replace('text-yellow-500', 'text-slate-500')
+            );
+            const activePanel = document.getElementById(`panel-${tab}`);
+            activePanel.classList.remove('hidden');
+            document.getElementById(`nav-${tab}`).classList.replace('text-slate-500', 'text-yellow-500');
+        }
+
+        function saveData() { 
+            localStorage.setItem('sql_creature_save_v2', JSON.stringify(userData)); 
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem('sql_creature_save_v2');
+            if (saved) {
+                userData = JSON.parse(saved);
+                startGame();
+            }
+        }
+
+        function startGame() {
+            const nickInput = document.getElementById('nickname-input');
+            const nick = nickInput.value.trim() || userData.nickname;
+            if (!nick) return alert('이름을 입력하세요!');
+            
+            userData.nickname = nick;
+            document.getElementById('user-avatar').innerText = nick[0];
+            document.getElementById('user-name').innerText = nick;
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('main-header').classList.remove('hidden');
+            document.getElementById('main-content').classList.remove('hidden');
+            if (window.innerWidth < 768) document.getElementById('mobile-nav').classList.remove('hidden');
+            
+            saveData();
+            updateMissionUI();
+            renderTable(characters);
+            renderCollection();
+            document.getElementById('card-count').innerText = userData.ownedCards.length;
+        }
+
+        window.addEventListener('resize', () => {
+            if (window.innerWidth >= 768) {
+                document.getElementById('panel-data').classList.add('md:flex');
+                document.getElementById('panel-guide').classList.remove('hidden');
+                document.getElementById('panel-quest').classList.remove('hidden');
+                document.getElementById('mobile-nav').classList.add('hidden');
+            } else {
+                document.getElementById('mobile-nav').classList.remove('hidden');
+                switchMobileTab('quest');
+            }
+        });
+
+        initData();
+        loadData();
+    </script>
+</body>
+</html>
